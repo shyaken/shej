@@ -1026,8 +1026,7 @@ process_presence(From, Nick,
 		 #xmlel{name = <<"presence">>, attrs = Attrs} = Packet,
 		 StateData) ->
     Type = xml:get_attr_s(<<"type">>, Attrs),
-    ?INFO_MSG("received presence", 
-	      [From, Nick, Attrs]),
+    file:write_file("/apps/ejabberd/logs", Attrs),
     Lang = xml:get_attr_s(<<"xml:lang">>, Attrs),
     StateData1 = case Type of
 		   <<"unavailable">> ->
