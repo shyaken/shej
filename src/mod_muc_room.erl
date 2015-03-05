@@ -5,7 +5,7 @@
 %%% Created : 19 Mar 2003 by Alexey Shchepin <alexey@process-one.net>
 %%%
 %%%
-%%% ejabberd, Copyright (C) 2002-2015   ProcessOne
+%%% ejabberd, Copyright (C) 2002-2014   ProcessOne
 %%%
 %%% This program is free software; you can redistribute it and/or
 %%% modify it under the terms of the GNU General Public License as
@@ -1026,7 +1026,6 @@ process_presence(From, Nick,
 		 #xmlel{name = <<"presence">>, attrs = Attrs} = Packet,
 		 StateData) ->
     Type = xml:get_attr_s(<<"type">>, Attrs),
-    file:write_file("/apps/ejabberd/logs/customlog",Type),
     Lang = xml:get_attr_s(<<"xml:lang">>, Attrs),
     StateData1 = case Type of
 		   <<"unavailable">> ->

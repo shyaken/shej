@@ -5,7 +5,7 @@
 %%% Created :  5 Mar 2005 by Alexey Shchepin <alexey@process-one.net>
 %%%
 %%%
-%%% ejabberd, Copyright (C) 2002-2015   ProcessOne
+%%% ejabberd, Copyright (C) 2002-2014   ProcessOne
 %%%
 %%% This program is free software; you can redistribute it and/or
 %%% modify it under the terms of the GNU General Public License as
@@ -835,13 +835,12 @@ add_user_to_group(Host, US, Group) ->
 	  (?MODULE):set_group_opts(Host, Group,
 				   GroupOpts ++ MoreGroupOpts);
       nomatch ->
-	  DisplayedToGroups = displayed_to_groups(Group, Host),
-	  DisplayedGroups = get_displayed_groups(Group, LServer),
-	  push_user_to_displayed(LUser, LServer, Group, Host, both, DisplayedToGroups),
-	  push_displayed_to_user(LUser, LServer, Host, both, DisplayedGroups),
-	  broadcast_user_to_displayed(LUser, LServer, Host, both, DisplayedToGroups),
-	  broadcast_displayed_to_user(LUser, LServer, Host, both, DisplayedGroups),
-	  add_user_to_group(Host, US, Group, gen_mod:db_type(Host, ?MODULE))
+	  push_user_to_displayed(LUser, LServer, Group, Host,
+				 both),
+	  push_displayed_to_user(LUser, LServer, Group, Host,
+				 both),
+	  add_user_to_group(Host, US, Group,
+			    gen_mod:db_type(Host, ?MODULE))
     end.
 
 add_user_to_group(Host, US, Group, mnesia) ->
@@ -866,17 +865,12 @@ add_user_to_group(Host, US, Group, odbc) ->
 	end,
     ejabberd_odbc:sql_transaction(Host, F).
 
-get_displayed_groups(Group, LServer) ->
+push_displayed_to_user(LUser, LServer, Group, Host,
+		       Subscription) ->
     GroupsOpts = groups_with_opts(LServer),
     GroupOpts = proplists:get_value(Group, GroupsOpts, []),
-    proplists:get_value(displayed_groups, GroupOpts, []).
-
-broadcast_displayed_to_user(LUser, LServer, Host, Subscription, DisplayedGroups) ->
-    [broadcast_members_to_user(LUser, LServer, DGroup, Host,
-			  Subscription)
-	 || DGroup <- DisplayedGroups].
-
-push_displayed_to_user(LUser, LServer, Host, Subscription, DisplayedGroups) ->
+    DisplayedGroups = proplists:get_value(displayed_groups,
+					  GroupOpts, []),
     [push_members_to_user(LUser, LServer, DGroup, Host,
 			  Subscription)
      || DGroup <- DisplayedGroups].
@@ -900,10 +894,10 @@ remove_user_from_group(Host, US, Group) ->
       nomatch ->
 	  Result = remove_user_from_group(Host, US, Group,
 					  gen_mod:db_type(Host, ?MODULE)),
-	  DisplayedToGroups = displayed_to_groups(Group, Host),
-	  DisplayedGroups = get_displayed_groups(Group, LServer),
-	  push_user_to_displayed(LUser, LServer, Group, Host, remove, DisplayedToGroups),
-	  push_displayed_to_user(LUser, LServer, Host, remove, DisplayedGroups),
+	  push_user_to_displayed(LUser, LServer, Group, Host,
+				 remove),
+	  push_displayed_to_user(LUser, LServer, Group, Host,
+				 remove),
 	  Result
     end.
 
@@ -936,17 +930,10 @@ push_members_to_user(LUser, LServer, Group, Host,
 		  end,
 		  Members).
 
-broadcast_members_to_user(LUser, LServer, Group, Host, Subscription) ->
-    Members = get_group_users(Host, Group),
-    lists:foreach(
-      fun({U, S}) ->
-	      broadcast_subscription(U, S, {LUser, LServer, <<"">>}, Subscription)
-      end, Members).
-
 register_user(User, Server) ->
     Groups = get_user_groups({User, Server}),
     [push_user_to_displayed(User, Server, Group, Server,
-			    both, displayed_to_groups(Group, Server))
+			    both)
      || Group <- Groups].
 
 remove_user(User, Server) ->
@@ -978,17 +965,16 @@ push_user_to_members(User, Server, Subscription) ->
 		  end,
 		  lists:usort(SpecialGroups ++ UserGroups)).
 
-push_user_to_displayed(LUser, LServer, Group, Host, Subscription, DisplayedToGroupsOpts) ->
+push_user_to_displayed(LUser, LServer, Group, Host,
+		       Subscription) ->
     GroupsOpts = groups_with_opts(Host),
     GroupOpts = proplists:get_value(Group, GroupsOpts, []),
     GroupName = proplists:get_value(name, GroupOpts, Group),
+    DisplayedToGroupsOpts = displayed_to_groups(Group,
+						Host),
     [push_user_to_group(LUser, LServer, GroupD, Host,
 			GroupName, Subscription)
      || {GroupD, _Opts} <- DisplayedToGroupsOpts].
-
-broadcast_user_to_displayed(LUser, LServer, Host, Subscription, DisplayedToGroupsOpts) ->
-    [broadcast_user_to_group(LUser, LServer, GroupD, Host, Subscription)
-	|| {GroupD, _Opts} <- DisplayedToGroupsOpts].
 
 push_user_to_group(LUser, LServer, Group, Host,
 		   GroupName, Subscription) ->
@@ -1001,13 +987,6 @@ push_user_to_group(LUser, LServer, Group, Host,
 		  end,
 		  get_group_users(Host, Group)).
 
-broadcast_user_to_group(LUser, LServer, Group, Host, Subscription) ->
-    lists:foreach(
-      fun({U, S})  when (U == LUser) and (S == LServer) -> ok;
-         ({U, S}) ->
-	      broadcast_subscription(LUser, LServer, {U, S, <<"">>}, Subscription)
-      end, get_group_users(Host, Group)).
-
 %% Get list of groups to which this group is displayed
 displayed_to_groups(GroupName, LServer) ->
     GroupsOpts = groups_with_opts(LServer),
@@ -1018,7 +997,11 @@ displayed_to_groups(GroupName, LServer) ->
 		 end,
 		 GroupsOpts).
 
-push_item(User, Server, Item) ->
+push_item(User, Server, From, Item) ->
+    ejabberd_sm:route(From,
+		      jlib:make_jid(User, Server, <<"">>),
+                      {broadcast, {item, Item#roster.jid,
+				   Item#roster.subscription}}),
     Stanza = jlib:iq_to_xml(#iq{type = set,
 				xmlns = ?NS_ROSTER,
 				id = <<"push", (randoms:get_string())/binary>>,
@@ -1039,7 +1022,8 @@ push_roster_item(User, Server, ContactU, ContactS,
 		   us = {User, Server}, jid = {ContactU, ContactS, <<"">>},
 		   name = <<"">>, subscription = Subscription, ask = none,
 		   groups = [GroupName]},
-    push_item(User, Server, Item).
+    push_item(User, Server,
+	      jlib:make_jid(<<"">>, Server, <<"">>), Item).
 
 item_to_xml(Item) ->
     Attrs1 = [{<<"jid">>,
@@ -1083,16 +1067,14 @@ user_available(New) ->
     case length(Resources) of
       %% first session for this user
       1 ->
-	  UserGroups = get_user_groups({LUser, LServer}),
+	  OnlineGroups = get_special_users_groups_online(LServer),
 	  lists:foreach(fun (OG) ->
 				?DEBUG("user_available: pushing  ~p @ ~p grp ~p",
 				       [LUser, LServer, OG]),
-			  DisplayedToGroups = displayed_to_groups(OG, LServer),
-			  DisplayedGroups = get_displayed_groups(OG, LServer),
-			  broadcast_displayed_to_user(LUser, LServer, LServer, both, DisplayedGroups),
-			  broadcast_user_to_displayed(LUser, LServer, LServer, both, DisplayedToGroups)
+				push_user_to_displayed(LUser, LServer, OG,
+						       LServer, both)
 			end,
-			UserGroups);
+			OnlineGroups);
       _ -> ok
     end.
 
@@ -1107,9 +1089,9 @@ unset_presence(LUser, LServer, Resource, Status) ->
 	  OnlineGroups = get_special_users_groups_online(LServer),
 	  lists:foreach(fun (OG) ->
 				push_user_to_displayed(LUser, LServer, OG,
-						       LServer, remove, displayed_to_groups(OG, LServer)),
-				push_displayed_to_user(LUser, LServer,
-						       LServer, remove, displayed_to_groups(OG, LServer))
+						       LServer, remove),
+				push_displayed_to_user(LUser, LServer, OG,
+						       LServer, remove)
 			end,
 			OnlineGroups);
       _ -> ok
@@ -1324,11 +1306,6 @@ shared_roster_group_parse_query(Host, Group, Query) ->
 			     true -> [{online_users, true}];
 			     false -> []
 			   end,
-	  CurrentDisplayedGroups = get_displayed_groups(Group, Host),
-	  AddedDisplayedGroups =  DispGroups -- CurrentDisplayedGroups,
-	  RemovedDisplayedGroups = CurrentDisplayedGroups -- DispGroups,
-	  displayed_groups_update(OldMembers, RemovedDisplayedGroups, remove),
-	  displayed_groups_update(OldMembers, AddedDisplayedGroups, both),
 	  (?MODULE):set_group_opts(Host, Group,
 				   NameOpt ++
 				     DispGroupsOpt ++
@@ -1368,25 +1345,6 @@ split_grouphost(Host, Group) ->
       [GroupName, HostName] -> {HostName, GroupName};
       [_] -> {Host, Group}
     end.
-
-broadcast_subscription(User, Server, ContactJid, Subscription) ->
-    ejabberd_sm:route(
-		      jlib:make_jid(<<"">>, Server, <<"">>),
-		      jlib:make_jid(User, Server, <<"">>),
-                      {broadcast, {item, ContactJid,
-				   Subscription}}).
-
-displayed_groups_update(Members, DisplayedGroups, Subscription) ->
-    lists:foreach(fun({U, S}) ->
-	push_displayed_to_user(U, S, S, Subscription, DisplayedGroups),
-	    case Subscription of
-		both ->
-		    broadcast_displayed_to_user(U, S, S, to, DisplayedGroups),
-		    broadcast_displayed_to_user(U, S, S, from, DisplayedGroups);
-		Subscr ->
-		    broadcast_displayed_to_user(U, S, S, Subscr, DisplayedGroups)
-	    end
-	end, Members).
 
 make_jid_s(U, S) ->
     ejabberd_odbc:escape(jlib:jid_to_string(jlib:jid_tolower(jlib:make_jid(U,

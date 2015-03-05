@@ -5,7 +5,7 @@
 %%% Created : 26 Apr 2008 by Evgeniy Khramtsov <xramtsov@gmail.com>
 %%%
 %%%
-%%% ejabberd, Copyright (C) 2002-2015   ProcessOne
+%%% ejabberd, Copyright (C) 2002-2014   ProcessOne
 %%%
 %%% This program is free software; you can redistribute it and/or
 %%% modify it under the terms of the GNU General Public License as
@@ -549,11 +549,10 @@ get_transfer_protocol(PortString) ->
 
 get_port_listeners(PortNumber) ->
     AllListeners = ejabberd_config:get_option(listen, fun(V) -> V end),
-    lists:filter(fun (Listener) when is_list(Listener) ->
-			 case proplists:get_value(port, Listener) of
-			   PortNumber -> true;
-			   _ -> false
-			 end;
+    lists:filter(fun ({{Port, _Ip, _Netp}, _Module1,
+		       _Opts1})
+			 when Port == PortNumber ->
+			 true;
 		     (_) -> false
 		 end,
 		 AllListeners).
@@ -563,11 +562,12 @@ get_captcha_transfer_protocol([]) ->
 	    "is not a ejabberd_http listener with "
 	    "'captcha' option. Change the port number "
 	    "or specify http:// in that option.">>);
-get_captcha_transfer_protocol([Listener | Listeners]) when is_list(Listener) ->
-    case proplists:get_value(module, Listener) == ejabberd_http andalso
-	   proplists:get_bool(captcha, Listener) of
+get_captcha_transfer_protocol([{{_Port, _Ip, tcp},
+				ejabberd_http, Opts}
+			       | Listeners]) ->
+    case lists:member(captcha, Opts) of
       true ->
-	  case proplists:get_bool(tls, Listener) of
+	  case lists:member(tls, Opts) of
 	    true -> https;
 	    false -> http
 	  end;

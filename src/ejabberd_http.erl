@@ -5,7 +5,7 @@
 %%% Created : 27 Feb 2004 by Alexey Shchepin <alexey@process-one.net>
 %%%
 %%%
-%%% ejabberd, Copyright (C) 2002-2015   ProcessOne
+%%% ejabberd, Copyright (C) 2002-2014   ProcessOne
 %%%
 %%% This program is free software; you can redistribute it and/or
 %%% modify it under the terms of the GNU General Public License as
@@ -299,16 +299,13 @@ process_header(State, Data) ->
 		  _ -> ok
 		end,
 		#state{sockmod = SockMod, socket = Socket,
-		       options = State#state.options,
 		       request_handlers = State#state.request_handlers};
 	    _ ->
 		#state{end_of_request = true,
-		       options = State#state.options,
 		       request_handlers = State#state.request_handlers}
 	  end;
       _ ->
 	  #state{end_of_request = true,
-		 options = State#state.options,
 		 request_handlers = State#state.request_handlers}
     end.
 

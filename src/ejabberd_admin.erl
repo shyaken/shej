@@ -5,7 +5,7 @@
 %%% Created :  7 May 2006 by Mickael Remond <mremond@process-one.net>
 %%%
 %%%
-%%% ejabberd, Copyright (C) 2002-2015   ProcessOne
+%%% ejabberd, Copyright (C) 2002-2014   ProcessOne
 %%%
 %%% This program is free software; you can redistribute it and/or
 %%% modify it under the terms of the GNU General Public License as
@@ -31,7 +31,6 @@
 	 status/0, reopen_log/0,
 	 stop_kindly/2, send_service_message_all_mucs/2,
 	 registered_vhosts/0,
-	 reload_config/0,
 	 %% Erlang
 	 update_list/0, update/1,
 	 %% Accounts
@@ -135,11 +134,6 @@ commands() ->
 			module = ?MODULE, function = registered_vhosts,
 			args = [],
 			result = {vhosts, {list, {vhost, string}}}},
-     #ejabberd_commands{name = reload_config, tags = [server],
-			desc = "Reload ejabberd configuration file into memory",
-			module = ?MODULE, function = reload_config,
-			args = [],
-			result = {res, rescode}},
 
      #ejabberd_commands{name = import_file, tags = [mnesia],
 			desc = "Import user data from jabberd14 spool file",
@@ -258,10 +252,9 @@ reopen_log() ->
 %%% Stop Kindly
 %%%
 
-stop_kindly(DelaySeconds, AnnouncementTextString) ->
-    Subject = list_to_binary(io_lib:format("Server stop in ~p seconds!", [DelaySeconds])),
-    WaitingDesc = list_to_binary(io_lib:format("Waiting ~p seconds", [DelaySeconds])),
-    AnnouncementText = list_to_binary(AnnouncementTextString),
+stop_kindly(DelaySeconds, AnnouncementText) ->
+    Subject = io_lib:format("Server stop in ~p seconds!", [DelaySeconds]),
+    WaitingDesc = io_lib:format("Waiting ~p seconds", [DelaySeconds]),
     Steps = [
 	     {"Stopping ejabberd port listeners",
 	      ejabberd_listener, stop_listeners, []},
@@ -357,11 +350,6 @@ registered_users(Host) ->
 
 registered_vhosts() ->
 	?MYHOSTS.
-
-reload_config() ->
-    ejabberd_config:reload_file(),
-    acl:start(),
-    shaper:start().
 
 %%%
 %%% Migration management
