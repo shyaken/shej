@@ -1027,7 +1027,7 @@ process_presence(From, Nick,
 		 StateData) ->
     Type = xml:get_attr_s(<<"type">>, Attrs),
     ?INFO_MSG("received presence", 
-	      [jlib:jid_to_string(From), Nick, Attrs]),
+	      [Nick, Attrs]),
     Lang = xml:get_attr_s(<<"xml:lang">>, Attrs),
     StateData1 = case Type of
 		   <<"unavailable">> ->
