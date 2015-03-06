@@ -1151,9 +1151,8 @@ close_room_if_temporary_and_empty(StateData1) ->
     end.
 
 is_user_online(JID, StateData) ->
-	true.
-%%    LJID = jlib:jid_tolower(JID),
-%%    (?DICT):is_key(LJID, StateData#state.users).
+    LJID = jlib:jid_tolower(JID),
+    (?DICT):is_key(LJID, StateData#state.users).
 
 %% Check if the user is occupant of the room, or at least is an admin or owner.
 is_occupant_or_admin(JID, StateData) ->
