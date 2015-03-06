@@ -479,6 +479,7 @@ normal_state({route, From, Nick,
 	      #xmlel{name = <<"presence">>} = Packet},
 	     StateData) ->
     Activity = get_user_activity(From, StateData),
+    ?INFO_MSG("Packet ~s",[Packet]),
     Now = now_to_usec(now()),
     MinPresenceInterval =
 	trunc(gen_mod:get_module_opt(StateData#state.server_host,
