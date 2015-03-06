@@ -1152,6 +1152,7 @@ close_room_if_temporary_and_empty(StateData1) ->
 
 is_user_online(JID, StateData) ->
     LJID = jlib:jid_tolower(JID),
+    ?INFO_MSG("State user ~s, dict ~s"[StateData#state.users,(?DICT):is_key(LJID, StateData#state.users)]),
     (?DICT):is_key(LJID, StateData#state.users).
 
 %% Check if the user is occupant of the room, or at least is an admin or owner.
